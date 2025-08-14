@@ -1,0 +1,6 @@
+[submodule "java-maven-app-on-ansible"]
+	path = java-maven-app-on-ansible
+	url = https://github.com/Sora-mmh/java-maven-app-for-ansible-execution.git
+[submodule "config-management"]
+	path = config-management
+	url = https://github.com/Sora-mmh/monitoring-with-prometheus-p.git
