@@ -1,0 +1,52 @@
+- name: Install Ansible
+  hosts: tag_Name_ansible_server # from dynamic inventory file
+  become: yes
+  vars:
+    ansible_ssh_private_key_file: ~/Downloads/ansible-control-server-key.pem
+  tasks:
+  - name: Update apt repo cache
+    apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+  - name: Install ansible and boto3
+    apt: 
+      name:
+      - ansible
+      - python3-boto3
+
+- name: Install Ansible
+  hosts: tag_Name_ansible_server # from dynamic inventory file
+  vars:
+    ansible_ssh_private_key_file: ~/Downloads/ansible-control-server-key.pem
+  tasks:
+  - name: Install ansible role from galaxy
+    community.general.ansible_galaxy_install:
+      type: role
+      name: geerlingguy.mysql
+  - name: Install ansible collection for ec2 module
+    community.general.ansible_galaxy_install:
+      type: collection
+      name: amazon.aws
+  - name: Ensure .aws dir exists
+    file: path=~/.aws state=directory
+  - name: Copy aws credentials
+    ansible.builtin.copy:
+      src: ~/.aws/credentials
+      dest: /home/ubuntu/.aws/credentials
+  - name: Copy private ssh key for the app servers
+    ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: /home/ubuntu/
+      mode: 0400
+    with_fileglob: ~/Downloads/ansible-*.pem
+  - name: Copy ansible playbook and configuration files
+    ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: /home/ubuntu/
+    with_fileglob: ./6-*.yaml
+  - name: Copy ansible config file
+    ansible.builtin.copy:
+      src: ansible.cfg
+      dest: /home/ubuntu/
+  - name: Copy java jar file
+    ansible.builtin.copy:
+      src: ~/Demo-projects/Bootcamp/Exercises/bootcamp-java-mysql-project/build/libs/bootcamp-java-mysql-project-1.0-SNAPSHOT.jar
+      dest: /home/ubuntu/

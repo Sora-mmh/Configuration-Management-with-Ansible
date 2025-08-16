@@ -1,0 +1,46 @@
+# Install mysql db on db-server
+- name: Configure Database server
+  hosts: tag_Name_database_server # from dynamic inventory file
+  vars_files:
+  - 6-vars.yaml
+  roles:
+  - role: geerlingguy.mysql
+    become: yes
+  tasks:
+  - name: validate mysql service started
+    shell: ps aux | grep mysql
+    register: app_status
+  - debug: msg="{{ app_status.stdout_lines }}"
+
+# Deploy java application
+- name: Install Java
+  hosts: tag_Name_web_server # from dynamic inventory file
+  become: yes
+  tasks:
+  - name: Update apt repo cache
+    apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+  - name: Install java 11
+    apt: name=openjdk-11-jdk 
+
+- name: Configure web server
+  hosts: tag_Name_web_server # from dynamic inventory file
+  tasks:
+  - name: Copy jar file to server
+    copy:
+      src: /home/ubuntu/bootcamp-java-mysql-project-1.0-SNAPSHOT.jar
+      dest: java-app.jar
+
+  - name: Start java application with needed env vars
+    command: java -jar java-app.jar &
+    environment:
+      DB_USER: my-user
+      DB_PWD: my-pass
+      DB_SERVER: "{{ hostvars[groups['tag_Name_database_server'][0]]['ansible_default_ipv4']['address'] }}" # TODO set this to private IP of db server
+      DB_NAME: my-app-db
+    async: 1000
+    poll: 0
+  
+  - name: validate java app started
+    shell: ps aux | grep java 
+    register: app_status
+  - debug: msg="{{ app_status.stdout_lines }}"  

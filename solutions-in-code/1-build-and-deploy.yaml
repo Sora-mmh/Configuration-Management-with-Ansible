@@ -1,0 +1,77 @@
+- name: Create Linux user
+  hosts: web_server
+  gather_facts: True
+  become: True
+  tasks:
+  - name: Create linux user
+    user:
+      name: "{{ linux_user }}"
+      group: adm
+
+- name: Make sure Java is installed
+  hosts: web_server
+  become: True
+  tasks:
+  - name: Update apt repo cache
+    apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+  - name: Install java version 11
+    apt: name=openjdk-11-jre-headless
+
+- name: Build application
+  hosts: localhost
+  gather_facts: False
+  tasks:
+  - name: Build jar
+    ansible.builtin.command:
+      chdir: "{{ project_dir }}"
+      cmd: gradle clean build
+
+- name: Stop the currently running java application and remove old jar file
+  hosts: web_server
+  become: True
+  become_user: "{{ linux_user }}"
+  tasks:
+  - name: Find jar file
+    find: 
+      paths: /home/{{ linux_user }} 
+      patterns: "*.jar"
+      file_type: file
+    register: find_result
+  - debug: msg={{find_result}}  
+
+  - name: Get the PID of Java running process
+    ignore_errors: yes
+    shell: "ps -few | grep java | awk '{print $2}'"
+    register: running_java_processes
+    when: find_result.files != []
+  - debug: msg={{running_java_processes}}
+  - name: Kill running Java process
+    ignore_errors: yes
+    shell: "kill {{ running_java_processes.stdout_lines[0] }}"
+    when: running_java_processes.stdout_lines | length > 2
+  
+  - name: Remove the jar file
+    shell: rm {{find_result.files[0].path}}
+    when: find_result.files != []
+
+- name: Deploy java application
+  hosts: web_server
+  become: True
+  become_user: "{{ linux_user }}"
+  tasks:
+  - name: Copy jar file to remote server
+    copy:
+      src: "{{ project_dir }}/build/libs/{{ jar_name }}" # local machine
+      dest: /home/{{ linux_user }} # remote machine
+  - name: Start the application
+    command: 
+      chdir: /home/{{ linux_user }}
+      cmd: java -jar {{ jar_name }} & 
+    async: 1000 # without async and poll will hang 
+    poll: 0
+    register: result
+  - debug: msg="{{ result }}"  
+  - name: Check that application started and is running
+    shell: ps aux | grep java
+    register: app_status
+  - debug: msg="{{ app_status.stdout_lines }}"  

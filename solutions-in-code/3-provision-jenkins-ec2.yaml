@@ -1,0 +1,40 @@
+# Play Provision Jenkins Server
+- name: Provision Jenkins server
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: get vpc_information
+    amazon.aws.ec2_vpc_net_info:
+      region: "{{ aws_region }}"
+    register: vpc_result
+  - debug: msg={{ vpc_result }}
+  - name: Start an instance with a public IP address
+    amazon.aws.ec2_instance:
+      name: "jenkins-server"
+      key_name: "{{ key_name }}"
+      region: "{{ aws_region }}"
+      vpc_subnet_id: "{{ subnet_id }}"
+      instance_type: t2.medium
+      security_group: default
+      network:
+        assign_public_ip: true
+      image_id: "{{ ami_id }}"
+      tags:
+        server: Jenkins
+    register: ec2_result
+  # On creation, ec2_result object doesn't get public_ip attribute immediately, cuz the assignment takes time, so we wait and then query again
+  - pause:
+      seconds: 60
+  - name: Get public_ip address of the ec2 instance 
+    amazon.aws.ec2_instance_info:
+      region: "{{ aws_region }}"
+      instance_ids:
+      - "{{ ec2_result.instance_ids[0] }}"
+    register: ec2_result
+  - name: update hosts file
+    lineinfile:
+      path: "hosts-jenkins-server"
+      line: "{{ ec2_result.instances[0].public_ip_address }} ansible_ssh_private_key_file={{ ssh_key_path }} ansible_user={{ ssh_user }}"
+      insertbefore: BOF
+    register: file_result
+  - debug: msg={{ file_result }}

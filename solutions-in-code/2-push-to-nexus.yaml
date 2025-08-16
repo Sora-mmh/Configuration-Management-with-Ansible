@@ -1,0 +1,26 @@
+- name: Push to Nexus repo
+  hosts: localhost
+  gather_facts: False
+  tasks:
+  - name: Push jar artifact to Nexus repo
+    # This protects password from being displayed in task output. Comment out if you want to see the output for debugging
+    no_log: True
+    
+    uri:
+      # Notes on Nexus upload artifact URL:
+      # 1 - You can add group name in the url ".../com/my/group/{{ artifact_name }}..."
+      # 2 - The file name (my-app-1.0-SNAPSHOT.jar) must match the url path of (.../com/my-app/1.0-SNAPSHOT/my-app-1.0-SNAPSHOT.jar), otherwise it won't work
+      # 3 - You can only upload file with SNAPSHOT in the version into the maven-snapshots repo, so naming matters
+      url: "{{ nexus_url }}/repository/maven-snapshots/com/my/{{ artifact_name }}/{{ artifact_version }}/{{ artifact_name }}-{{ artifact_version }}.jar"
+      
+      method: PUT
+      src: "{{ jar_file_path }}"
+      user: "{{ nexus_user }}"
+      password: "{{ nexus_password }}"
+      force_basic_auth: yes
+      
+      # With default "raw" body_format request form is too large, and causes 500 server error on Nexus (Form is larger than max length 200000), So we are setting it to 'json'
+      body_format: json
+      
+      status_code:
+      - 201

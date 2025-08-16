@@ -1,0 +1,27 @@
+- name: Update apt repo cache
+  apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+- name: Install java 11
+  apt: name=openjdk-11-jdk 
+
+- name: Add GPG keys
+  apt_key:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io.key
+    state: present
+- name: Install Jenkins from debian package repository
+  apt_repository:
+    repo: deb http://pkg.jenkins.io/debian-stable binary/
+    filename: /etc/apt/sources.list.d/jenkins
+    state: present
+    
+- name: Update apt repo cache
+  apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+
+- name: Install Jenkins
+  apt: name=jenkins
+
+- name: Install Docker
+  apt: name=docker.io
+- name: Start Docker
+  service: 
+    name: docker
+    state: started

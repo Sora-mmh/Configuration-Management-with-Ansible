@@ -1,0 +1,61 @@
+# Play Get Server Address
+- name: Get server ip 
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: Get public_ip address of the ec2 instance 
+    amazon.aws.ec2_instance_info:
+      region: "{{ aws_region }}"
+      filters:
+        "tag:Name": "jenkins-server"
+    register: ec2_result
+
+# Prepare Jenkins Server - by installing Docker
+- name: Prepare server for Jenkins
+  hosts: "{{ hostvars['localhost']['ec2_result'].instances[0].public_ip_address }}"
+  become: yes
+  tasks:
+  - name: Update apt repo cache
+    apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+  - name: Install Docker
+    apt: name=docker.io
+  - name: Install pip3
+    apt: name=python3-pip
+  - name: Install Docker python module
+    apt: name=python3-docker
+  - name: Start Docker Service
+    systemd:
+      name: docker
+      state: started
+
+
+- name: Start Jenkins container on ec2 instance
+  hosts: "{{ hostvars['localhost']['ec2_result'].instances[0].public_ip_address }}"
+  become: yes
+  tasks:
+  - name: Get location of docker executable
+    command: 
+      cmd: which docker
+    register: docker_result
+
+  - name: Start jenkins container
+    # docker module used: https://docs.ansible.com/ansible/latest/collections/community/docker/docker_container_module.html#ansible-collections-community-docker-docker-container-module
+    community.docker.docker_container:
+      name: jenkins
+      image: jenkins/jenkins:lts
+      volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "{{ docker_result.stdout }}:/usr/bin/docker"
+      - jenkins_home:/var/jenkins_home
+      ports:
+      - "8080:8080"
+      - "50000:50000"
+  
+- name: Set Docker permission
+  hosts: "{{ hostvars['localhost']['ec2_result'].instances[0].public_ip_address }}"
+  become: yes
+  tasks:  
+  - name: Set docker permission for Jenkins user
+    ansible.builtin.file:
+      path: '/var/run/docker.sock'
+      mode: '666'

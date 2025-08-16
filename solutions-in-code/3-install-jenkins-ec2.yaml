@@ -1,0 +1,80 @@
+# Play Get Server Address
+- name: Get server ip 
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: Get public_ip address of the ec2 instance 
+    amazon.aws.ec2_instance_info:
+      region: "{{ aws_region }}"
+      filters:
+        "tag:Name": "jenkins-server"
+    register: ec2_result
+
+# Play Prepare Jenkins Server - with all needed tools, Jenkins, Docker, Nodejs & npm
+- name: Prepare server for Jenkins
+  hosts: "{{ hostvars['localhost']['ec2_result'].instances[0].public_ip_address }}"
+  become: yes
+  tasks:
+  - name: Install Java
+    yum:
+      name: java-11-amazon-corretto
+      update_cache: yes
+      state: present
+  - name: Install Jenkins Repository
+    get_url:
+      url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+      dest: /etc/yum.repos.d/jenkins.repo
+  - name: Import RPM key
+    rpm_key:
+      state: present
+      key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+  - name: Install /etc/yum.repos.d/jenkins.repo
+    yum:
+      name: jenkins
+      update_cache: yes
+      state: present
+  - name: Install Docker
+    yum: 
+      name: docker
+      update_cache: yes
+      state: present
+  - name: Check that nvm installed
+    stat:
+      path: ~/.nvm
+    register: stat_result
+  - name: Download installer
+    get_url: 
+      url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh
+      dest: ./install.sh
+    when: not stat_result.stat.exists
+  - name: 
+    shell: bash install.sh
+    when: not stat_result.stat.exists
+  - name: install node
+    shell: "source /root/.nvm/nvm.sh && nvm install 8.0.0 && node --version" 
+    args:
+      executable: /bin/bash
+    register: cmd_result
+  - debug: msg={{ cmd_result }}
+
+# Play Start Jenkins
+- name: Start Jenkins
+  hosts: "{{ hostvars['localhost']['ec2_result'].instances[0].public_ip_address }}"
+  become: yes
+  tasks:
+  - name: Start Jenkins server
+    service:
+      name: jenkins
+      state: started
+  - name: Wait 10 seconds to check the Jenkins port
+    pause:
+      seconds: 10  
+  - name: Check that application started with netstat
+    command: netstat -plnt 
+    register: app_status
+  - debug: msg={{ app_status }} 
+  - name: Print out Jenkins admin password
+    slurp:
+      src: /var/lib/jenkins/secrets/initialAdminPassword
+    register: jenkins_pwd
+  - debug: msg={{ jenkins_pwd['content'] }}

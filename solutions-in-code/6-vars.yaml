@@ -1,0 +1,10 @@
+mysql_root_password: secret-root-pass
+mysql_databases:
+  - name: my-app-db
+    encoding: latin1
+    collation: latin1_general_ci
+mysql_users:
+  - name: my-user
+    host: "%"
+    password: my-pass
+    priv: "my-app-db.*:ALL"

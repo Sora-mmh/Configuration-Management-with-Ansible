@@ -1,0 +1,31 @@
+# create db server without public ip and web server with public ip
+- name: Provision Database and Web servers
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: Start an instance without a public IP address
+    amazon.aws.ec2_instance:
+      name: database-server
+      key_name: "{{ key_name }}"
+      region: "{{ aws_region }}"
+      vpc_subnet_id: "{{ subnet_id_db }}"
+      instance_type: t2.micro
+      security_group: default
+      image_id: "{{ ami_id }}"
+      network:
+        assign_public_ip: false
+      tags:
+        server: database
+  - name: Start an instance with a public IP address
+    amazon.aws.ec2_instance:
+      name: web-server
+      key_name: "{{ key_name }}"
+      region: "{{ aws_region }}"
+      vpc_subnet_id: "{{ subnet_id_web }}"
+      instance_type: t2.micro
+      security_group: default
+      image_id: "{{ ami_id }}"
+      network:
+        assign_public_ip: true
+      tags:
+        server: web
