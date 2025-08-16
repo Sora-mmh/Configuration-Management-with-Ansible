@@ -307,8 +307,7 @@ solutions-in-code/
 ├── kubernetes-manifests/
 │   ├── exercise-7/
 │   └── exercise-8/
-├── hosts-deploy-app
-├── hosts-jenkins-server
+├── hosts
 └── ansible.cfg
 ```
 
